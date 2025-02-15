@@ -1,89 +1,99 @@
-require('dotenv').config()
-const { Bot } = require("grammy")
+require('dotenv').config();
+const { Bot } = require("grammy");
 
-const bot = new Bot(process.env.BOT_API_KEY)
-let time = new Date()
-let hour = time.getSeconds()
-let weekday = time.getDay()
-const date1 = new Date(Date.UTC(2024, 8, 16));
-let weeks
-let data = {
-	1: {
-		day: 'monday',
-		lessons: {
-			first: 'мат анализ',
-			second: 'основы програмирования(семинар)',
-			third: 'компьютерная архитектура'
+const bot = new Bot(process.env.BOT_API_KEY);
 
-		}
-	},
-	2: {
-		day: 'Thuesday',
-		lessons: {
-			first: 'none',
-			second: 'none',
-			third: 'линейная алгебра'
+const startDate = new Date(Date.UTC(2024, 8, 16)); // Reference date for week calculation
+let weekType;
+let schedule = {
+    1: {
+        day: "Monday",
+        lessons: {
+            first: "Mathematical Analysis",
+            second: "Programming Basics (Seminar)",
+            third: "Computer Architecture"
+        }
+    },
+    2: {
+        day: "Tuesday",
+        lessons: {
+            first: "None",
+            second: "None",
+            third: "Linear Algebra"
+        }
+    },
+    3: {
+        day: "Wednesday",
+        lessons: {
+            first: "None",
+            second: "Programming Basics",
+            third: "English"
+        }
+    },
+    4: {
+        day: "Thursday",
+        lessons: {
+            first: "None",
+            second: "Azerbaijani",
+            third: "Programming Basics"
+        }
+    },
+    5: {
+        day: "Friday",
+        lessons: {
+            first: "Mathematical Analysis",
+            second: "English",
+            third: "None"
+        }
+    }
+};
 
-		}
-	},
-	3: {
-		day: 'Wensday',
-		lessons: {
-			first: 'none',
-			second: 'основы програмирования',
-			third: 'eng'
+// Function to update schedule based on week type
+function updateWeekType() {
+    let currentDate = new Date();
+    let dayDifference = Math.floor((currentDate - startDate) / (1000 * 60 * 60 * 24));
+    
+    weekType = Math.ceil(dayDifference / 7) % 2 === 0 ? "down" : "up";
 
-		}
-	},
-	4: {
-		day: 'Thursday',
-		lessons: {
-			first: 'none',
-			second: 'Азербайджанский',
-			third: 'основы програмивроания '
-
-		}
-	},
-	5: {
-		day: 'Friday',
-		lessons: {
-			first: 'мат анализ',
-			second: 'англиский',
-			third: 'none'
-
-		}
-	}
-
+    if (weekType === "up") {
+        schedule[2].lessons.second = "Linear Algebra (Seminar)";
+        schedule[5].lessons.third = "Azerbaijani";
+    } else {
+        schedule[3].lessons.second = "Programming Basics";
+        schedule[4].lessons.second = "Computer Architecture (Seminar)";
+    }
 }
-bot.command("start", async (cth) => {
-	setInterval(main, 1000)
-	async function main() {
-		let date2 = new Date();
-		let day_diff = Math.floor((date2 - date1) / (1000 * 60 * 60 * 24))
-		if (Math.ceil(day_diff / 7) % 2 == 0) {
-			weeks = 'down'
-		} else {
-			weeks = 'up'
-		}
-		if (weeks == 'up') {
-			data[2].lessons.second = 'линейная алгебра(семинар)'
-			data[5].lessons.third = 'Азербайджанский'
 
+// Function to send lesson schedule
+async function sendDailySchedule(ctx) {
+    updateWeekType();
 
-		} else {
-			data[3].lessons.second = 'основы програмирования'
-			data[4].lessons.second = 'компьютерная архитектура(семинар)'
-		}
-		time = new Date()
-		hour = time.getHours()
-		weekday = time.getDay() + 1
+    let currentTime = new Date();
+    let currentHour = currentTime.getHours();
+    let currentWeekday = currentTime.getDay(); // Sunday = 0, Monday = 1, ..., Friday = 5
 
-		if (hour == 2) {
-			await cth.reply(`day: ${data[weekday].day} \nweek: ${weeks} \nlessons:\n  							first: ${data[weekday].lessons.first} \n  							second: ${data[weekday].lessons.second} \n  							third: ${data[weekday].lessons.third}`)
+    if (currentWeekday >= 1 && currentWeekday <= 5 && currentHour === 2) { // Only send from Monday to Friday at 2 AM
+        let todaySchedule = schedule[currentWeekday];
 
-		}
-	}
+        await ctx.reply(
+            `📅 **Day:** ${todaySchedule.day}\n` +
+            `📆 **Week Type:** ${weekType.toUpperCase()}\n` +
+            `📚 **Lessons:**\n` +
+            `   1️⃣ ${todaySchedule.lessons.first}\n` +
+            `   2️⃣ ${todaySchedule.lessons.second}\n` +
+            `   3️⃣ ${todaySchedule.lessons.third}`
+        );
+    }
 
-})
+    // Schedule the function to run again after 1 minute
+    setTimeout(() => sendDailySchedule(ctx), 60 * 1000);
+}
 
-bot.start()
+// Bot command to start the schedule updates
+bot.command("start", async (ctx) => {
+    sendDailySchedule(ctx);
+    await ctx.reply("✅ Schedule updates started! You will receive daily lesson schedules at 2 AM.");
+});
+
+// Start the bot
+bot.start();
